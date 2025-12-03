@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Bill</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>BillApp</h1>
+            </div>
+            <nav class="nav-menu">
+                <a href="index.html" class="nav-link">
+                    <span class="icon">📊</span> Dashboard
+                </a>
+                <a href="products.html" class="nav-link">
+                    <span class="icon">📦</span> Stock
+                </a>
+                <a href="billing.html" class="nav-link active">
+                    <span class="icon">🧾</span> Create Bill
+                </a>
+                <a href="history.html" class="nav-link">
+                    <span class="icon">📋</span> History
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <h2>Create New Bill</h2>
+            </header>
+
+            <div class="billing-container">
+                <div class="billing-left">
+                    <div class="form-card">
+                        <h3>Select Products</h3>
+                        <div class="form-group">
+                            <label>Product</label>
+                            <select id="productSelect" onchange="addToBill()">
+                                <option value="">Choose a product...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity</label>
+                            <input type="number" id="quantityInput" min="1" value="1">
+                        </div>
+                        <button class="btn-primary" onclick="addToBill()" style="width: 100%; margin-top: 10px;">Add to Bill</button>
+                    </div>
+                </div>
+
+                <div class="billing-right">
+                    <div class="invoice-card">
+                        <h3>Current Bill</h3>
+                        <table class="invoice-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Qty</th>
+                                    <th>Price</th>
+                                    <th>GST</th>
+                                    <th>Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="billItems">
+                                <tr><td colspan="6" class="empty-state">No items added</td></tr>
+                            </tbody>
+                        </table>
+
+                        <div class="invoice-summary">
+                            <div class="summary-row">
+                                <span>Subtotal:</span>
+                                <span>₹<span id="subtotal">0.00</span></span>
+                            </div>
+                            <div class="summary-row">
+                                <span>GST:</span>
+                                <span>₹<span id="gstTotal">0.00</span></span>
+                            </div>
+                            <div class="summary-row total">
+                                <span>Total:</span>
+                                <span>₹<span id="billTotal">0.00</span></span>
+                            </div>
+                        </div>
+
+                        <div class="invoice-actions">
+                            <button class="btn-primary" onclick="generateBill()">Generate Bill</button>
+                            <button class="btn-secondary" onclick="clearBill()">Clear</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        let currentBill = [];
+
+        function loadProductsInSelect() {
+            const products = JSON.parse(localStorage.getItem('products')) || [];
+            const select = document.getElementById('productSelect');
+            
+            select.innerHTML = '<option value="">Choose a product...</option>';
+            products.forEach(product => {
+                select.innerHTML += `<option value="${product.id}">${product.name} (₹${product.price})</option>`;
+            });
+        }
+
+        function addToBill() {
+            const productId = parseInt(document.getElementById('productSelect').value);
+            const quantity = parseInt(document.getElementById('quantityInput').value);
+            
+            if (!productId || quantity < 1) {
+                alert('Please select a product and quantity');
+                return;
+            }
+
+            const products = JSON.parse(localStorage.getItem('products')) || [];
+            const product = products.find(p => p.id === productId);
+            
+            if (!product) return;
+
+            const existingItem = currentBill.find(item => item.id === productId);
+            
+            if (existingItem) {
+                existingItem.quantity += quantity;
+            } else {
+                currentBill.push({
+                    id: productId,
+                    name: product.name,
+                    price: product.price,
+                    gst: product.gst,
+                    quantity: quantity
+                });
+            }
+
+            updateBillDisplay();
+            document.getElementById('productSelect').value = '';
+            document.getElementById('quantityInput').value = '1';
+        }
+
+        function updateBillDisplay() {
+            const tbody = document.getElementById('billItems');
+            
+            if (currentBill.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No items added</td></tr>';
+                updateSummary();
+                return;
+            }
+
+            tbody.innerHTML = currentBill.map((item, index) => {
+                const gstAmount = (item.price * item.quantity * item.gst) / 100;
+                const total = item.price * item.quantity + gstAmount;
+                return `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td>${item.quantity}</td>
+                        <td>₹${item.price.toFixed(2)}</td>
+                        <td>${item.gst}%</td>
+                        <td>₹${total.toFixed(2)}</td>
+                        <td><button class="btn-icon danger" onclick="removeFromBill(${index})">🗑️</button></td>
+                    </tr>
+                `;
+            }).join('');
+
+            updateSummary();
+        }
+
+        function updateSummary() {
+            let subtotal = 0;
+            let gstAmount = 0;
+
+            currentBill.forEach(item => {
+                const itemSubtotal = item.price * item.quantity;
+                const itemGst = itemSubtotal * item.gst / 100;
+                subtotal += itemSubtotal;
+                gstAmount += itemGst;
+            });
+
+            const total = subtotal + gstAmount;
+
+            document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+            document.getElementById('gstTotal').textContent = gstAmount.toFixed(2);
+            document.getElementById('billTotal').textContent = total.toFixed(2);
+        }
+
+        function removeFromBill(index) {
+            currentBill.splice(index, 1);
+            updateBillDisplay();
+        }
+
+        function clearBill() {
+            if (confirm('Clear bill?')) {
+                currentBill = [];
+                updateBillDisplay();
+            }
+        }
+
+        function generateBill() {
+            if (currentBill.length === 0) {
+                alert('Add items to bill first');
+                return;
+            }
+
+            let subtotal = 0;
+            let gstAmount = 0;
+
+            currentBill.forEach(item => {
+                const itemSubtotal = item.price * item.quantity;
+                const itemGst = itemSubtotal * item.gst / 100;
+                subtotal += itemSubtotal;
+                gstAmount += itemGst;
+            });
+
+            const total = subtotal + gstAmount;
+            const billId = 'BILL-' + Date.now();
+            
+            const bill = {
+                id: billId,
+                date: new Date().toISOString(),
+                items: currentBill,
+                subtotal: subtotal,
+                gst: gstAmount,
+                total: total
+            };
+
+            const bills = JSON.parse(localStorage.getItem('bills')) || [];
+            bills.push(bill);
+            localStorage.setItem('bills', JSON.stringify(bills));
+
+            // Update stock
+            const products = JSON.parse(localStorage.getItem('products')) || [];
+            currentBill.forEach(item => {
+                const product = products.find(p => p.id === item.id);
+                if (product) {
+                    product.quantity -= item.quantity;
+                }
+            });
+            localStorage.setItem('products', JSON.stringify(products));
+
+            alert('Bill generated successfully!\nBill ID: ' + billId);
+            currentBill = [];
+            updateBillDisplay();
+        }
+
+        loadProductsInSelect();
+    </script>
+</body>
+</html>

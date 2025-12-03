@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice History - Billing System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>BillApp</h1>
+            </div>
+            <nav class="nav-menu">
+                <a href="index.html" class="nav-link">
+                    <span class="icon">📊</span> Dashboard
+                </a>
+                <a href="products.html" class="nav-link">
+                    <span class="icon">📦</span> Stock
+                </a>
+                <a href="billing.html" class="nav-link">
+                    <span class="icon">🧾</span> Create Bill
+                </a>
+                <a href="history.html" class="nav-link active">
+                    <span class="icon">📋</span> History
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <h2>Invoice History</h2>
+            </header>
+
+            <!-- Invoice List -->
+            <div class="history-section">
+                <div class="bills-grid" id="billsGrid">
+                    <p class="empty-state">No bills yet</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for viewing invoice -->
+    <div id="invoiceModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="invoiceContent"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const billId = params.get('id');
+
+        loadHistory();
+        if (billId) {
+            setTimeout(() => viewInvoice(billId), 100);
+        }
+
+        function loadHistory() {
+            const bills = JSON.parse(localStorage.getItem('bills')) || [];
+            const grid = document.getElementById('billsGrid');
+            
+            if (bills.length === 0) {
+                grid.innerHTML = '<p class="empty-state">No bills yet</p>';
+                return;
+            }
+
+            grid.innerHTML = bills.reverse().map(bill => `
+                <div class="bill-card">
+                    <div class="bill-card-header">
+                        <h4>${bill.id}</h4>
+                        <span class="bill-date">${new Date(bill.date).toLocaleDateString()}</span>
+                    </div>
+                    <div class="bill-card-body">
+                        <p class="bill-amount">₹${bill.total.toFixed(2)}</p>
+                        <small>${bill.items.length} items</small>
+                    </div>
+                    <div class="bill-card-actions">
+                        <button class="btn-primary" onclick="viewInvoice('${bill.id}')">View</button>
+                        <button class="btn-secondary" onclick="printInvoice('${bill.id}')">Print</button>
+                        <button class="btn-secondary" onclick="downloadInvoice('${bill.id}')">Download</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function viewInvoice(billId) {
+            const bills = JSON.parse(localStorage.getItem('bills')) || [];
+            const bill = bills.find(b => b.id === billId);
+            
+            if (!bill) return;
+
+            const invoiceContent = document.getElementById('invoiceContent');
+            invoiceContent.innerHTML = generateInvoiceHTML(bill);
+            document.getElementById('invoiceModal').style.display = 'block';
+        }
+
+        function generateInvoiceHTML(bill) {
+            let itemsHTML = bill.items.map(item => {
+                const gstAmount = (item.price * item.quantity * item.gst) / 100;
+                const total = item.price * item.quantity + gstAmount;
+                return `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td class="text-right">${item.quantity}</td>
+                        <td class="text-right">₹${item.price.toFixed(2)}</td>
+                        <td class="text-right">${item.gst}%</td>
+                        <td class="text-right">₹${gstAmount.toFixed(2)}</td>
+                        <td class="text-right">₹${total.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            return `
+                <div class="invoice-print">
+                    <h2 class="text-center">INVOICE</h2>
+                    <p class="text-center">${bill.id}</p>
+                    <p class="text-center">${new Date(bill.date).toLocaleString()}</p>
+                    
+                    <table class="invoice-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Qty</th>
+                                <th>Price</th>
+                                <th>GST %</th>
+                                <th>GST Amount</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHTML}
+                        </tbody>
+                    </table>
+
+                    <div class="invoice-footer">
+                        <div class="summary-row">
+                            <span>Subtotal:</span>
+                            <span>₹${bill.subtotal.toFixed(2)}</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>GST:</span>
+                            <span>₹${bill.gst.toFixed(2)}</span>
+                        </div>
+                        <div class="summary-row total">
+                            <span>Grand Total:</span>
+                            <span>₹${bill.total.toFixed(2)}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function printInvoice(billId) {
+            const bills = JSON.parse(localStorage.getItem('bills')) || [];
+            const bill = bills.find(b => b.id === billId);
+            
+            if (!bill) return;
+
+            const printWindow = window.open('', '', 'height=500,width=800');
+            printWindow.document.write('<html><head><title>Invoice</title>');
+            printWindow.document.write('<link rel="stylesheet" href="styles.css">');
+            printWindow.document.write('</head><body>');
+            printWindow.document.write(generateInvoiceHTML(bill));
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        function downloadInvoice(billId) {
+            const bills = JSON.parse(localStorage.getItem('bills')) || [];
+            const bill = bills.find(b => b.id === billId);
+            
+            if (!bill) return;
+
+            let content = `INVOICE\n\n`;
+            content += `Bill ID: ${bill.id}\n`;
+            content += `Date: ${new Date(bill.date).toLocaleString()}\n\n`;
+            content += `ITEMS:\n`;
+            content += `${'Product'.padEnd(30)} ${'Qty'.padEnd(6)} ${'Price'.padEnd(12)} ${'GST%'.padEnd(6)} ${'Total'.padEnd(12)}\n`;
+            content += `${'-'.repeat(66)}\n`;
+            
+            bill.items.forEach(item => {
+                const gstAmount = (item.price * item.quantity * item.gst) / 100;
+                const total = item.price * item.quantity + gstAmount;
+                content += `${item.name.padEnd(30)} ${item.quantity.toString().padEnd(6)} ₹${item.price.toFixed(2).padEnd(11)} ${item.gst}% ₹${total.toFixed(2)}\n`;
+            });
+            
+            content += `${'-'.repeat(66)}\n\n`;
+            content += `Subtotal: ₹${bill.subtotal.toFixed(2)}\n`;
+            content += `GST: ₹${bill.gst.toFixed(2)}\n`;
+            content += `TOTAL: ₹${bill.total.toFixed(2)}\n`;
+
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${bill.id}.txt`;
+            link.click();
+        }
+
+        function closeModal() {
+            document.getElementById('invoiceModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('invoiceModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

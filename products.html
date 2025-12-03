@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Management</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>BillApp</h1>
+            </div>
+            <nav class="nav-menu">
+                <a href="index.html" class="nav-link">
+                    <span class="icon">📊</span> Dashboard
+                </a>
+                <a href="products.html" class="nav-link active">
+                    <span class="icon">📦</span> Stock
+                </a>
+                <a href="billing.html" class="nav-link">
+                    <span class="icon">🧾</span> Create Bill
+                </a>
+                <a href="history.html" class="nav-link">
+                    <span class="icon">📋</span> History
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <h2>Stock Management</h2>
+                <button class="btn-primary" onclick="toggleForm()">+ Add Product</button>
+            </header>
+
+            <!-- Add/Edit Product Form -->
+            <div id="formContainer" class="form-container hidden">
+                <div class="form-card">
+                    <h3 id="formTitle">Add New Product</h3>
+                    <form id="productForm" onsubmit="saveProduct(event)">
+                        <div class="form-group">
+                            <label>Product Name *</label>
+                            <input type="text" id="productName" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Price (₹) *</label>
+                                <input type="number" id="productPrice" step="0.01" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Quantity *</label>
+                                <input type="number" id="productQty" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>GST % *</label>
+                            <select id="productGST" required>
+                                <option value="">Select GST</option>
+                                <option value="0">0%</option>
+                                <option value="5">5%</option>
+                                <option value="12">12%</option>
+                                <option value="18">18%</option>
+                                <option value="28">28%</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">Save Product</button>
+                            <button type="button" class="btn-secondary" onclick="toggleForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Products Table -->
+            <div class="table-container">
+                <table class="products-table" id="productsTable">
+                    <thead>
+                        <tr>
+                            <th>Product Name</th>
+                            <th>Price (₹)</th>
+                            <th>Quantity</th>
+                            <th>GST %</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr><td colspan="6" class="empty-state">No products added yet</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        let editingId = null;
+
+        function loadProducts() {
+            const products = JSON.parse(localStorage.getItem('products')) || [];
+            const tbody = document.getElementById('tableBody');
+            
+            if (products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No products added yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = products.map(product => `
+                <tr ${product.quantity < 5 ? 'class="low-stock"' : ''}>
+                    <td>${product.name}</td>
+                    <td>₹${product.price.toFixed(2)}</td>
+                    <td>${product.quantity}</td>
+                    <td>${product.gst}%</td>
+                    <td>
+                        <span class="badge ${product.quantity < 5 ? 'badge-danger' : 'badge-success'}">
+                            ${product.quantity < 5 ? 'Low Stock' : 'In Stock'}
+                        </span>
+                    </td>
+                    <td class="action-buttons">
+                        <button class="btn-icon" onclick="editProduct(${product.id})" title="Edit">✏️</button>
+                        <button class="btn-icon danger" onclick="deleteProduct(${product.id})" title="Delete">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function toggleForm() {
+            const form = document.getElementById('formContainer');
+            form.classList.toggle('hidden');
+            if (form.classList.contains('hidden')) {
+                editingId = null;
+                document.getElementById('productForm').reset();
+            }
+        }
+
+        function saveProduct(e) {
+            e.preventDefault();
+            const products = JSON.parse(localStorage.getItem('products')) || [];
+            
+            const newProduct = {
+                id: editingId || Date.now(),
+                name: document.getElementById('productName').value,
+                price: parseFloat(document.getElementById('productPrice').value),
+                quantity: parseInt(document.getElementById('productQty').value),
+                gst: parseFloat(document.getElementById('productGST').value)
+            };
+
+            if (editingId) {
+                const index = products.findIndex(p => p.id === editingId);
+                products[index] = newProduct;
+            } else {
+                products.push(newProduct);
+            }
+
+            localStorage.setItem('products', JSON.stringify(products));
+            loadProducts();
+            toggleForm();
+            document.getElementById('productForm').reset();
+        }
+
+        function editProduct(id) {
+            const products = JSON.parse(localStorage.getItem('products')) || [];
+            const product = products.find(p => p.id === id);
+            
+            document.getElementById('formTitle').textContent = 'Edit Product';
+            document.getElementById('productName').value = product.name;
+            document.getElementById('productPrice').value = product.price;
+            document.getElementById('productQty').value = product.quantity;
+            document.getElementById('productGST').value = product.gst;
+            
+            editingId = id;
+            document.getElementById('formContainer').classList.remove('hidden');
+        }
+
+        function deleteProduct(id) {
+            if (confirm('Are you sure?')) {
+                let products = JSON.parse(localStorage.getItem('products')) || [];
+                products = products.filter(p => p.id !== id);
+                localStorage.setItem('products', JSON.stringify(products));
+                loadProducts();
+            }
+        }
+
+        loadProducts();
+    </script>
+</body>
+</html>
